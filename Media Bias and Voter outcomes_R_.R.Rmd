@@ -1,0 +1,151 @@
+---
+title: "Tom_Zhang_R_HW_2"
+output:
+  pdf_document: default
+  '': default
+date: '2022-11-12'
+---
+
+Problem 1)
+a) beta 1 is the effect of whether Fox News is present in 2000 on GOP Vote Share in 2000
+b) beta 2 is the share of GOP voters in a town in 2000 for countries that do not have Fox news. 
+
+Problem 2)
+```{r}
+# Import libraries
+library(data.table)
+library(ggplot2)
+library(sandwich)
+library(car)
+library(lmtest)
+library(AER)
+
+
+# Loading data
+data = data.table(read.csv(file = "foxData.csv", header = TRUE, sep=","))
+```
+
+Problem 3) 
+The average GOP vote share in 2000 is about 53.7% and the fraction of towns that have Fox news in about 19.5%..
+```{r}
+# Summary of fox data
+data[ , list( avgVoting2000 = mean(rep2000) , fractionOfFox2000 = mean(foxnews2000))]
+```
+
+Problem 4)
+Since Fox News is based in New York City; thus, for the towns that have Fox News access is correlated with being near New York City. Therefore, region would be considered as an omitted variable.
+
+Problem 5)
+Summary of votings by region
+
+```{r}
+data[,neDummy := region=="Northeast"]
+
+# Summary only in northeast
+summary_data_northeast = data[ , list( avgVoting2000 = mean(rep2000) , fractionOfFox2000 = mean(foxnews2000), sdVoting2000 = sd(rep2000), sdFox = sd(foxnews2000), N = NROW(foxnews2000)), by = neDummy]
+summary_data_northeast
+```
+
+t-test:
+Ho: frac_other == frac_northeast
+Ha: frac_other != frac_northeast
+```{r}
+data$region_Northeast =ifelse(data$region == "Northeast", 1 , 0)
+data_northeast = subset(data$foxnews2000, data$region_Northeast == "1")
+data_other = subset(data$foxnews2000, data$region_Northeast == "0")
+
+t.test(data_other,data_northeast)
+```
+Since t is 4.67>1.96, reject the null by statistically significant.
+
+The sign of bias should be negative as the data shows that there are more Fox News access in the Northeast, meaning
+Fox and northeast is positive Cov(Fox, Northeast), and Cov(GOP vote share, Northeast) is negative. Therefore, negative bias.
+ 
+Problem 6)
+The 1996 GOP voting share is an omitted bias because
+1) Correlated with Fox decision whether to enter the market in 2000. Since the stats in 1996 shows how well it is preforming and how many audience are interested.
+2) Also, 1996 stats help to monitor which town is more interested.
+Thus, GOP share in 1996 is an important omitted variable
+
+
+PART 2----------------------------------------------------------------------------------------------------------------
+
+Problem 7)
+
+Since t = 0.0763<1.96, we do not reject the null, and the effect of Fox New is not significant.
+```{r}
+# Model 1
+m1 = lm(rep2000 ~ foxnews2000, data = data)
+coeftest(m1,vcov = vcovHC(m1, type ="HC3"))
+
+```
+Problem 8)
+Since we see that beta_foxnew2000 decreased, we know it is biased, and thus it is in line with prediction
+```{r}
+# Model 2
+m2 = lm(rep2000 ~ foxnews2000 + rep1996, data = data)
+m2
+```
+
+Problem 9)
+Using Model 3 from Problem 10) adding a dummy for region.
+Beta_South is -0.012104, meaning that if a region is in south or not is associated with 0.012104 units of decrease in GOP vote shares in 2000, holding other constant.
+
+Since Midwest is not included, then Midwest will be in the Beta) of the regression, meaning that Midwest will be part of the baseline of the regression. Not included to avoid multi-collinear.
+
+
+Problem 10)
+H0: beta_foxnew2000 == 0
+Ha: beta_foxnew2000 != 0
+```{r}
+
+# Model 3
+m3 = lm(rep2000 ~ foxnews2000 + rep1996 + factor(region), data = data)
+summary(m3)
+linearHypothesis(m3,c("factor(region)Northeast","factor(region)South","factor(region)West"),vcov=vcovHC(m3, type= c("HC3")))
+```
+Since q = 3, cv = 2.6
+Since F=204.36 > 2.6, we reject the null significantly.
+
+Problem 11)
+For the number of channels to be an omitted variable, it needs to be both correlated with fox news entry(Already correlated shown) and the GOP vote shares in 2000. 
+
+The number of channels could be correlated with GOP vote shares in the sense that with more channel implies larger population in the town or the town is more modern and thus more people or modern city means more democratic persuit. Thus, number of channels and GOP vote could be correlated in this way.
+
+Problem 12)
+```{r}
+
+# Model 4
+m4 = lm(rep2000 ~ foxnews2000 + rep1996 + factor(region) + channels, data = data)
+coeftest(m4,vcov = vcovHC(m4, type ="HC3"))
+```
+
+The coefficient of Fox is statistically significant at a level of 10% with "*", but not significant at 5% level.
+
+
+Problem 13)
+```{r}
+# Plot the graph
+ggplot(data, aes(x = income2000, y = rep2000, color = as.factor(region))) + geom_point()
+
+```
+ 
+```{r}
+# Include Income as a regressor and test the fox news effect
+
+# Model 5
+m5 = lm(rep2000 ~ foxnews2000 + rep1996 + factor(region) + channels + income2000, data = data)
+coeftest(m4,vcov = vcovHC(m4, type ="HC3"))
+```
+
+Problem 14)
+
+Pros: We can practice internal validity, meaning that we are able to add factors into the regression to reduce confounds and noise.
+
+Drawbacks: External validity cannot be practice, as People from different backgrounds may intrepret the news differently. For example, Local Americans and International students or non-Americans.
+
+Omitted Variables: Education, income, race could all be omitted variables that we may have missed. These factors are definitely correlated to GOP vote shares and political tendency.
+
+
+
+
